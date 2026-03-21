@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Classifier</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #e74c3c, #8e44ad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: #888;
+            font-size: 0.95rem;
+        }
+
+        /* ===== MODEL STATS BAR ===== */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        .stat-chip {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.82rem;
+            color: #aaa;
+        }
+        .stat-chip span {
+            color: #7c83fd;
+            font-weight: 600;
+        }
+
+        /* ===== MAIN CARD ===== */
+        .card {
+            max-width: 780px;
+            margin: 0 auto 25px auto;
+            background: #1a1a2e;
+            border-radius: 16px;
+            border: 1px solid #2a2a4a;
+            padding: 28px;
+        }
+
+        /* ===== TEXTAREA ===== */
+        .input-label {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 10px;
+            display: block;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            background: #0f0f1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            padding: 14px;
+            resize: vertical;
+            outline: none;
+            transition: border 0.2s;
+            font-family: 'Segoe UI', sans-serif;
+            line-height: 1.6;
+        }
+        textarea:focus {
+            border-color: #7c83fd;
+        }
+
+        /* ===== BUTTON ===== */
+        .btn-analyze {
+            width: 100%;
+            margin-top: 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, #e74c3c, #8e44ad);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            letter-spacing: 0.5px;
+        }
+        .btn-analyze:hover  { opacity: 0.9; }
+        .btn-analyze:active { transform: scale(0.98); }
+        .btn-analyze:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ===== LOADING SPINNER ===== */
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+        .spinner-ring {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid #2a2a4a;
+            border-top-color: #7c83fd;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== RESULTS SECTION ===== */
+        .results {
+            display: none;
+            max-width: 780px;
+            margin: 0 auto;
+        }
+
+        /* ===== RISK BADGE ===== */
+        .risk-badge {
+            text-align: center;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 2px solid;
+            animation: fadeIn 0.4s ease;
+        }
+        .risk-badge .risk-emoji  { font-size: 2.5rem; margin-bottom: 8px; }
+        .risk-badge .risk-label  {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        .risk-badge .risk-sublabel {
+            font-size: 0.88rem;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        /* ===== PROBABILITY GAUGE ===== */
+        .gauge-card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease;
+        }
+        .gauge-title {
+            font-size: 0.88rem;
+            color: #888;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .gauge-bar-bg {
+            background: #0f0f1a;
+            border-radius: 50px;
+            height: 22px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .gauge-bar-fill {
+            height: 100%;
+            border-radius: 50px;
+            width: 0%;
+            transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .gauge-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg,
+                transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .gauge-percentage {
+            text-align: center;
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        /* ===== KEYWORDS SECTION ===== */
+        .keywords-card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.6s ease;
+        }
+        .keywords-title {
+            font-size: 0.88rem;
+            color: #888;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .keyword-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .keyword-chip {
+            background: rgba(231, 76, 60, 0.15);
+            border: 1px solid rgba(231, 76, 60, 0.4);
+            color: #e74c3c;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 500;
+        }
+        .no-keywords {
+            color: #2ecc71;
+            font-size: 0.9rem;
+        }
+
+        /* ===== HIGHLIGHTED TEXT ===== */
+        .highlighted-email {
+            background: #0f0f1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 0.88rem;
+            line-height: 1.7;
+            max-height: 200px;
+            overflow-y: auto;
+            color: #ccc;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        mark.highlight {
+            background: rgba(231, 76, 60, 0.3);
+            color: #ff6b6b;
+            border-radius: 3px;
+            padding: 1px 3px;
+            font-weight: 600;
+        }
+
+        /* ===== RESET BUTTON ===== */
+        .btn-reset {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            background: transparent;
+            color: #888;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reset:hover {
+            border-color: #7c83fd;
+            color: #7c83fd;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f0f1a; }
+        ::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>🛡️ Spam Classifier</h1>
+        
+    </div>
+
+    
+
+    <!-- INPUT CARD -->
+    <div class="card">
+        <label class="input-label">📧 Paste email content below</label>
+        <textarea id="emailInput"
+                  placeholder="Paste your email here...&#10;&#10;Example: Congratulations! You've been selected as a winner..."></textarea>
+        <button class="btn-analyze" id="analyzeBtn" onclick="analyzeEmail()">
+            🔍 Analyze Email
+        </button>
+    </div>
+
+    <!-- SPINNER -->
+    <div class="spinner" id="spinner">
+        <div class="spinner-ring"></div>
+        <div>Analyzing email...</div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="results">
+
+        <!-- RISK BADGE -->
+        <div class="risk-badge" id="riskBadge">
+            <div class="risk-emoji" id="riskEmoji"></div>
+            <div class="risk-label"  id="riskLabel"></div>
+            <div class="risk-sublabel" id="riskSublabel"></div>
+        </div>
+
+        <!-- PROBABILITY GAUGE -->
+        <div class="gauge-card">
+            <div class="gauge-title">📊 Spam Probability</div>
+            <div class="gauge-percentage" id="gaugePercent">0%</div>
+            <div class="gauge-bar-bg">
+                <div class="gauge-bar-fill" id="gaugeBar"></div>
+            </div>
+            <div class="gauge-labels">
+                <span>0% — Definitely Safe</span>
+                <span>100% — Definitely Spam</span>
+            </div>
+        </div>
+
+        <!-- KEYWORDS CARD -->
+        <div class="keywords-card">
+            <div class="keywords-title">⚠️ Suspicious Keywords Found</div>
+            <div class="keyword-chips" id="keywordChips"></div>
+            <div class="keywords-title" style="margin-top:16px; margin-bottom:10px;">
+                📄 Highlighted Email Text
+            </div>
+            <div class="highlighted-email" id="highlightedText"></div>
+        </div>
+
+        <!-- RESET -->
+        <button class="btn-reset" onclick="resetForm()">
+            ← Analyze Another Email
+        </button>
+
+    </div>
+
+    <script>
+        // ===================================================
+        // ANALYZE EMAIL — called when button is clicked
+        // ===================================================
+        async function analyzeEmail() {
+            const emailText = document.getElementById("emailInput").value.trim();
+
+            // Validate
+            if (!emailText) {
+                alert("Please paste an email first!");
+                return;
+            }
+            if (emailText.length < 5) {
+                alert("Email is too short!");
+                return;
+            }
+
+            // Show spinner, hide results
+            document.getElementById("analyzeBtn").disabled = true;
+            document.getElementById("spinner").style.display = "block";
+            document.getElementById("results").style.display = "none";
+
+            try {
+                // Send to Flask backend
+                const response = await fetch("/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: emailText })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                // Render results
+                renderResults(data);
+
+            } catch (err) {
+                alert("Something went wrong. Is the server running?");
+                console.error(err);
+            } finally {
+                document.getElementById("analyzeBtn").disabled = false;
+                document.getElementById("spinner").style.display = "none";
+            }
+        }
+
+        // ===================================================
+        // RENDER RESULTS
+        // ===================================================
+        function renderResults(data) {
+
+            // ---- Risk Badge ----
+            const badge = document.getElementById("riskBadge");
+            badge.style.borderColor = data.risk_color;
+            badge.style.backgroundColor = data.risk_color + "18";
+
+            document.getElementById("riskEmoji").textContent   = data.risk_emoji;
+            document.getElementById("riskLabel").textContent   = data.risk_level + " RISK";
+            document.getElementById("riskLabel").style.color   = data.risk_color;
+            document.getElementById("riskSublabel").textContent =
+                data.is_spam
+                ? `This email is likely SPAM (${data.probability}% confidence)`
+                : `This email appears SAFE (${data.probability}% spam probability)`;
+
+            // ---- Probability Gauge ----
+            document.getElementById("gaugePercent").textContent = data.probability + "%";
+            document.getElementById("gaugePercent").style.color = data.risk_color;
+
+            // Animate bar after short delay
+            const bar = document.getElementById("gaugeBar");
+            bar.style.width = "0%";
+            bar.style.background = `linear-gradient(90deg, #2ecc71, ${data.risk_color})`;
+            setTimeout(() => {
+                bar.style.width = data.probability + "%";
+            }, 100);
+
+            // ---- Keywords ----
+            const chipsDiv = document.getElementById("keywordChips");
+            chipsDiv.innerHTML = "";
+
+            if (data.found_keywords.length > 0) {
+                data.found_keywords.forEach(kw => {
+                    const chip = document.createElement("span");
+                    chip.className = "keyword-chip";
+                    chip.textContent = kw;
+                    chipsDiv.appendChild(chip);
+                });
+            } else {
+                chipsDiv.innerHTML = '<span class="no-keywords">✅ No suspicious keywords detected</span>';
+            }
+
+            // ---- Highlighted Text ----
+            document.getElementById("highlightedText").innerHTML = data.highlighted_text;
+
+            // ---- Show results ----
+            document.getElementById("results").style.display = "block";
+
+            // Scroll to results smoothly
+            document.getElementById("results").scrollIntoView({
+                behavior: "smooth", block: "start"
+            });
+        }
+
+        // ===================================================
+        // RESET FORM
+        // ===================================================
+        function resetForm() {
+            document.getElementById("emailInput").value = "";
+            document.getElementById("results").style.display = "none";
+            document.getElementById("emailInput").focus();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        // Allow Ctrl+Enter to submit
+        document.getElementById("emailInput").addEventListener("keydown", function(e) {
+            if (e.ctrlKey && e.key === "Enter") analyzeEmail();
+        });
+    </script>
+
+</body>
+</html>

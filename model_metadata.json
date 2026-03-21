@@ -1,0 +1,19 @@
+{
+    "model_name": "Hybrid CNN-BiLSTM Spam Classifier",
+    "architecture": "Multi-kernel CNN + BiLSTM + FedAvg",
+    "vocab_size": 20000,
+    "max_len": 300,
+    "embed_dim": 150,
+    "num_clients": 4,
+    "best_round": 6,
+    "total_rounds": 11,
+    "val_accuracy": 0.9855,
+    "val_auc": 0.9971,
+    "val_loss": 0.0463,
+    "threshold": 0.5,
+    "training_samples": 208716,
+    "classes": {
+        "0": "SAFE",
+        "1": "SPAM"
+    }
+}
